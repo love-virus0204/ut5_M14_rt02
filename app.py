@@ -2,12 +2,17 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import csv, os, datetime
 
-CSV_FILE = os.environ.get("CSV_FILE", "records.csv")
+CSV_FILE = os.environ.get("CSV_FILE", "records.csv").strip() or "records.csv"
 
 app = Flask(__name__)
 CORS(app)
 
 FIELDS = ["ts","date_shift","inspector","part_no","lot_prefix","lot_mid","lot_tail","lot_full","qty","remark"]
+
+def ensure_csv_dir():
+    d = os.path.dirname(CSV_FILE)
+    if d and not os.path.exists(d):
+        os.makedirs(d, exist_ok=True)
 
 def now_iso():
     return datetime.datetime.now(datetime.timezone.utc).astimezone().isoformat(timespec="seconds")
@@ -19,6 +24,7 @@ def read_rows():
         return list(csv.DictReader(f))
 
 def write_row(row: dict):
+    ensure_csv_dir()
     write_header = not os.path.exists(CSV_FILE)
     with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
@@ -29,6 +35,10 @@ def write_row(row: dict):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+@app.get("/debug/env")
+def debug_env():
+    return {"CSV_FILE": CSV_FILE, "exists": os.path.exists(CSV_FILE)}
 
 @app.get("/api/records")
 def get_records():
